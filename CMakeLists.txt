@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 2.6) 
  
-set (PROJECT crosses) 
+set (PROJECT cpppolygons) 
  
 project (${PROJECT}) 
 

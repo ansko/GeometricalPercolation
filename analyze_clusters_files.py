@@ -8,7 +8,7 @@ import pprint
 pprint=pprint.PrettyPrinter(indent=4).pprint
 
 
-def get_clusters_from_files(tau, N, edge_len):
+def get_clusters_from_files(fname_clusters, fname_minmaxes):
     entry_empty = {'cluster_size': None,
                    'cluster_x_len': None,
                    'cluster_y_len': None,
@@ -16,68 +16,68 @@ def get_clusters_from_files(tau, N, edge_len):
                    'particles': []}
     clusters = []
     entries = []
-    if True:
-        if True:
-            if True:
-                # analyzing file with list of clusters in the system
-                fname = 'clusters'#culster_folder + '/' + system_name
-                fin = open(fname, 'r')
-                for line in fin:
-                    ls = line.split()
-                    if len(ls) < 2:
-                        continue
-                    cluster = [int(ls[i]) for i in range(len(ls))]
-                    clusters.append(cluster)
-                for cluster in clusters:
-                    entry = copy.deepcopy(entry_empty)
-                    entry['cluster_size'] = len(cluster)
-                    entry['particles'] = cluster
-                    entries.append(entry)
-    if True:
-        if True:
-            if True:
-                # analyzing file with particle minmaxes
-                fname = 'coords.log'
-                fin = open(fname, 'r')
-                minmaxes = []
-                for line in fin:
-                    ls = line.split(' ') # number:minx:miny:minz:maxx:maxy:maxz
-                    minmaxes.append([float(ls[0]), float(ls[1]), float(ls[2]),
-                                     float(ls[3]), float(ls[4]), float(ls[5])])
-                # calculating every cluster's size
-                for cluster in entries:
-                    min_x = edge_len
-                    min_y = edge_len
-                    min_z = edge_len
-                    max_x = 0
-                    max_y = 0
-                    max_z = 0
-                    for particle in cluster['particles']:
-                        min_x = min(min_x, minmaxes[particle][0])
-                        min_y = min(min_y, minmaxes[particle][1])
-                        min_z = min(min_z, minmaxes[particle][2])
-                        max_x = max(max_x, minmaxes[particle][3])
-                        max_y = max(max_x, minmaxes[particle][4])
-                        max_z = max(max_x, minmaxes[particle][5])
-                    if min_x < 0:
-                        min_x = 0
-                    if min_y < 0:
-                        min_y = 0
-                    if min_z < 0:
-                        min_z = 0
-                    if max_x > edge_len:
-                        max_x = edge_len
-                    if max_y > edge_len:
-                        max_y = edge_len
-                    if max_z > edge_len:
-                        max_z = edge_len
-                    cluster['cluster_x_len'] = max_x - min_x
-                    cluster['cluster_y_len'] = max_y - min_y
-                    cluster['cluster_z_len'] = max_z - min_z
+    f = open('options.ini', 'r')
+    for line in f:
+        if line.startswith('CUBE_EDGE'):
+            edge_len = float(line.split()[1])
+    # analyzing file with list of clusters in the system
+    fin = open(fname_clusters, 'r')
+    for line in fin:
+        ls = line.split()
+        if len(ls) < 2:
+            continue
+        cluster = [int(ls[i]) for i in range(len(ls))]
+        clusters.append(cluster)
+    for cluster in clusters:
+        entry = copy.deepcopy(entry_empty)
+        entry['cluster_size'] = len(cluster)
+        entry['particles'] = cluster
+        entries.append(entry)
+    # analyzing file with particle minmaxes
+    fin = open(fname_minmaxes, 'r')
+    minmaxes = []
+    for line in fin:
+        ls = line.split(' ') # number:minx:miny:minz:maxx:maxy:maxz
+        minmaxes.append([float(ls[0]), float(ls[1]), float(ls[2]),
+                         float(ls[3]), float(ls[4]), float(ls[5])])
+        # calculating every cluster's size
+    for cluster in entries:
+        min_x = edge_len
+        min_y = edge_len
+        min_z = edge_len
+        max_x = 0
+        max_y = 0
+        max_z = 0
+        for particle in cluster['particles']:
+            min_x = min(min_x, minmaxes[particle][0])
+            min_y = min(min_y, minmaxes[particle][1])
+            min_z = min(min_z, minmaxes[particle][2])
+            max_x = max(max_x, minmaxes[particle][3])
+            max_y = max(max_x, minmaxes[particle][4])
+            max_z = max(max_x, minmaxes[particle][5])
+        if min_x < 0:
+            min_x = 0
+        if min_y < 0:
+            min_y = 0
+        if min_z < 0:
+            min_z = 0
+        if max_x > edge_len:
+            max_x = edge_len
+        if max_y > edge_len:
+            max_y = edge_len
+        if max_z > edge_len:
+            max_z = edge_len
+        cluster['cluster_x_len'] = max_x - min_x
+        cluster['cluster_y_len'] = max_y - min_y
+        cluster['cluster_z_len'] = max_z - min_z
     return entries
 
 
-def analyze_average_clusteriaztion_rate(clusters, filler_R, filler_h, N):
+def analyze_average_clusteriaztion_rate(clusters, N):
+    if N == 0:
+        print('WARNING:',
+              'analyzing clusterization in empty system')
+        return 0
     clusterized_particles_number = 0
     clusters_number = len(clusters)
     for cluster in clusters:
@@ -86,13 +86,12 @@ def analyze_average_clusteriaztion_rate(clusters, filler_R, filler_h, N):
 
 
 def analyze_average_cluster_size(clusters):
-    ave_cluster_size = 0  
-    clusters_number = len(clusters)
-    if clusters_number == 0:
+    if len(clusters) == 0:
         return 1
+    ave_cluster_size = 0  
     for cluster in clusters:
         ave_cluster_size += cluster['cluster_size']
-    ave_cluster_size /= clusters_number
+    ave_cluster_size /= len(clusters)
     return ave_cluster_size
 
 

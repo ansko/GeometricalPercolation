@@ -10,12 +10,16 @@ PercolationChecker::PercolationChecker(
 
 bool PercolationChecker::sideToSide()
 {
-    bool flag = false;
+// Not a percolationChecker but IntersectionsCalculator
+    // Finding intersections
+    SettingsParser sp("options.ini");
+    sp.parseSettings();
+    std::string fname_intersections = sp.getProperty("FNAME_INTERSECTIONS");
+    std::string fname_minmaxes = sp.getProperty("FNAME_MINMAXES");
     std::ofstream fout;
-    fout.open("/home/anton/Projects/Geometrical_Percolation/intersections.log");
+    fout.open(fname_intersections);
     std::vector<std::pair<int, int> > allIntersections;
     std::vector<std::vector<int> > chains;
-
     for(uint i = 0; i < shell_ptrs.size(); ++i)
         for(uint j = 0; j < shell_ptrs.size(); ++j) {
             if(i == j)
@@ -27,12 +31,10 @@ bool PercolationChecker::sideToSide()
                 allIntersections.push_back(std::pair<int, int>(i, j));
             }
         }
-
-    SettingsParser sp("/home/anton/Projects/Geometrical_Percolation/options.ini");
-    sp.parseSettings();
     float cubeSize = (float)std::stod(sp.getProperty("CUBE_EDGE_LENGTH"));
     fout.close();
-    fout.open("/home/anton/Projects/Geometrical_Percolation/coords.log");
+    // Listing minmaxes for every particle in the system
+    fout.open(fname_minmaxes);
     for(uint i = 0; i < shell_ptrs.size(); ++i) {
         auto shell_ptr = shell_ptrs[i];
         float minx = cubeSize;
@@ -60,5 +62,5 @@ bool PercolationChecker::sideToSide()
              << miny << " " << maxy << " "
              << minz << " " << maxz << std::endl;
     }
-    return flag;
+    fout.close();
 }
