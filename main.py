@@ -2,8 +2,10 @@
 
 
 import os
+import shutil
 import subprocess
-from shutil import move
+import time
+
 
 from analyze_clusters_files import (get_clusters_from_files,
                                     analyze_average_clusteriaztion_rate,
@@ -88,6 +90,7 @@ def run_one_time():
 
 
 def main():
+    """
     # checking whether old results exists in folder
     if 'results' in os.listdir():
         print('CRITICAL ERROR:',
@@ -95,7 +98,32 @@ def main():
         print('REASON OF EXIT:',
               'You may lose some data')
         return 0
+    """
+    program_start_time = time.time()
     # configuring
+      # vertices number
+    n = 6
+      # MAX_ATTEMPTS in cpppolygons
+    max_attempts = 100000
+      # adjusting N
+    if max_attempts < 1000000:
+        Ns_num = 12 
+    if max_attempts < 100000:
+        Ns_num = 9
+    if max_attempts < 10000:
+        Ns_num = 8
+    if max_attempts < 1000:
+        Ns_num = 5
+    if max_attempts < 100:
+        Ns_num = 3
+    # Ns =  [
+    #     5, 10, 15,          # 15 ~~ 100 steps for L == 5
+    #     20, 25,             # 25 ~~ 1k
+    #     30, 35, 40,         # 40 ~~ 10k
+    #     45, 50, 55,         # 55 ~~ 100k
+    #     60, 65, 70,         # 70 ~~ 1kk
+    # ]
+    Ns = [5 * i for i in range(1, Ns_num)]          # ...
     consecutive_unsuccessful_runs_number = 3
     fname_structures_log = 'results/structures_log'
     fname_log = 'main.log'
@@ -104,13 +132,11 @@ def main():
     edges = [5, 10, 15, 20, 25]
     Rs = [1, ]
     shs = [0.15, 0.25, 0.5]
-    Ns =  [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
-    max_attempts = 10000
-    full_attempts_treshold = 5
     f = open(fname_log, 'w')
     f.write('-----    Main parameters    -----\n')
     f.write('trajectories = ' + str(trajectories) + '\n')
     f.write('thicknesses = ' + str(thicknesses) + '\n')
+    f.write('max_attempts = ' + str(max_attempts) + '\n')
     f.write('edges = ' + str(edges) + '\n')
     f.write('Rs = ' + str(Rs) + '\n')
     f.write('shs = ' + str(shs) + '\n')
@@ -159,9 +185,24 @@ def main():
     unsuccess = 0
     flag = False
     old_L_value = 0
+    loop_start_time = time.time()
+    last_iteration_time = None
+    appro_last_time = 'infty'
     for parameter_set in parameters_sets:
-        print('run', run, 'skipped', skipped, 'at all', run + skipped,
-              '/', runs_num, 'runs')
+        iteration_start_time = time.time()
+        if last_iteration_time is not None and str(last_iteration_time) != '0.0':
+            last_iteration_time = '%.1f' % (0.000001 + float(last_iteration_time))
+        ongoing_time = time.time() - program_start_time
+        if runs_num - run - skipped != 0 and run + skipped != 0:
+            appro_last_time = (runs_num - run - skipped) / (run + skipped)
+            appro_last_time *= ongoing_time
+        if not appro_last_time == 'infty':
+            appro_last_time = int(appro_last_time)
+        print('run', run, 'skipped', skipped, 'done',
+              str(int(100 * (run + skipped + 1) / runs_num)) + '%',
+              'last iteration', last_iteration_time,
+              'passed', int(ongoing_time),
+              'last', appro_last_time, 'sec')
         if unsuccess == consecutive_unsuccessful_runs_number:
             # should go to next L value
             old_L_value = L # now all Ls should be greater than this value
@@ -179,6 +220,10 @@ def main():
         tau = parameter_set['tau']
         N = parameter_set['N']
         tra = parameter_set['tra']
+        L = parameter_set['L']
+        N *= (int(L / 5))**3   # Scaling of N for Ls greater than 5
+                               # because Ns is written for L == 5.
+                               # Seems to work properly.
         structure_name = '_'.join([str(word) for word in [run, h, L, R, sh, tau,
                                                           N, tra]])
         fname_py_log = 'results/py_logs/' + structure_name
@@ -193,8 +238,8 @@ def main():
             'FNAME_INTERSECTIONS': fname_intersections,
             'FNAME_CLUSTERS': fname_clusters,
             'FNAME_MINMAXES': fname_minmaxes,
-            'THICKNESS': thickness,
-            'CUBE_EDGE_LENGTH': edge,
+            'THICKNESS': h,
+            'CUBE_EDGE_LENGTH': L,
             'OUTER_RADIUS': R,
             'MAX_ATTEMPTS': max_attempts,
             'VERTICES_NUMBER': 6.0,
@@ -202,7 +247,7 @@ def main():
             'DISKS_NUM': N,
             'FNAME': fname_geo,
             'FNAME_LOG': cpp_output,
-            'TRAJECTORY': trajectory,
+            'TRAJECTORY': tra,
             'FNAME_STRUCTURES_LOG': fname_structures_log,
             'FNAME_LOG': fname_log
         }
@@ -224,9 +269,22 @@ def main():
         real_N = int(f.readline().split(':')[3])
         if real_N < N:
             unsuccess += 1
+        iteration_end_time = time.time()
+        last_iteration_time = iteration_end_time - iteration_start_time
     # cleaning folder
-    move('main.log', 'results/main.log')
+    shutil.move('main.log', 'results/main.log')
     os.remove('options.ini')
+    # recalling the parameters in console
+    print('-----    Main parameters    -----')
+    print('traj num:', int(trajectories))
+    print('hs:      ', *['%.1f' % h for h in thicknesses])
+    print('max_att: ', int(max_attempts))
+    print('Ls:      ', *[int(L) for L in edges])
+    print('Rs:      ', *[int(R) for R in Rs])
+    print('shs:     ', *['%.2f' % sh for sh in shs])
+    print('Ns:      ', *['%.2f' % N for N in Ns])
+    print('---------------------------------')
+    print('Working time:', int(time.time() - program_start_time), 'seconds')
     return 0
 
 
