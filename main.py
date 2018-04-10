@@ -6,39 +6,9 @@ import shutil
 import subprocess
 import time
 
-
-from analyze_clusters_files import (get_clusters_from_files,
-                                    analyze_average_clusteriaztion_rate,
-                                    analyze_average_cluster_size,
-                                    analyze_average_cluster_length)
-from create_clusters_files import create_clusters_files
-from reparser import reparse
-
-
-def analyze_clusters():
-    f = open('options.ini', 'r')
-    for line in f:
-        if line.startswith('FNAME '):
-            fname_geo = line.split()[1]
-        if line.startswith('FNAME_CLUSTERS'):
-            fname_clusters = line.split()[1]
-        if line.startswith('FNAME_MINMAXES'):
-            fname_minmaxes = line.split()[1]
-        if line.startswith('SHELL_THICKNESS'):
-            sh = float(line.split()[1])
-        if line.startswith('THICKNESS'):
-            h = float(line.split()[1])
-    f = open(fname_geo, 'r')
-    actual_particles_number = 0
-    for line in f:
-        if line.startswith('solid polygonalCylinder'):
-            actual_particles_number += 1
-    f.close()
-    clusters = get_clusters_from_files(fname_clusters, fname_minmaxes)
-    rate = analyze_average_clusteriaztion_rate(clusters, actual_particles_number)
-    size = analyze_average_cluster_size(clusters) # size in particles
-    length = analyze_average_cluster_length(clusters)
-    return (rate, size, length)
+from intersections_to_clusters import (intersections_to_clusters,
+                                       single_file_conversion)
+from get_cluster_lengths import calculate_lengths
 
 
 def run_one_time():
@@ -76,22 +46,12 @@ def run_one_time():
             if line.startswith('VERTICES_NUMBER'):
                 vertices_number = line.split()[1]
     subprocess.call([exe_polygonal,])
-    fname_reparsed = 'results/reparsed/' + fname_geo[17:-4]
-    reparse(fname_geo, fname_reparsed)
-    create_clusters_files(fname_intersections, fname_clusters, fname_minmaxes)
-    (rate, size, length) = analyze_clusters()
-    str_out = ('clu_rate:' + '%.2f' % rate +
-               ':ave_clu_size:' + '%.2f' % size +
-               ':ave_clu_len:' + '%.2f' % length)
-    f = open(fname_py_log, 'w')
-    f.write(str_out)
-    f.close()
     return None
 
 
 def main():
-    """
     # checking whether old results exists in folder
+    """
     if 'results' in os.listdir():
         print('CRITICAL ERROR:',
               'Folder "results" already exists')
@@ -101,11 +61,12 @@ def main():
     """
     program_start_time = time.time()
     # configuring
-      # vertices number
+    results_folder = 'results'
+        # vertices number
     n = 6
-      # MAX_ATTEMPTS in cpppolygons
-    max_attempts = 100000
-      # adjusting N
+        # MAX_ATTEMPTS in cpppolygons
+    max_attempts = 100
+        # adjusting N
     if max_attempts < 1000000:
         Ns_num = 12 
     if max_attempts < 100000:
@@ -123,9 +84,9 @@ def main():
     #     45, 50, 55,         # 55 ~~ 100k
     #     60, 65, 70,         # 70 ~~ 1kk
     # ]
-    Ns = [5 * i for i in range(1, Ns_num)]          # ...
+    Ns = [5 * i for i in range(1, Ns_num)]
     consecutive_unsuccessful_runs_number = 3
-    fname_structures_log = 'results/structures_log'
+    fname_structures_log = results_folder + '/structures_log'
     fname_log = 'main.log'
     trajectories = 10
     thicknesses = [0.1, ]
@@ -145,21 +106,23 @@ def main():
     f.close()
     # preparing for runs
     if not 'results' in os.listdir():
-        subprocess.call(["mkdir", "results"])
-    if not 'geofiles' in os.listdir('results'):
-        subprocess.call(["mkdir", "results/geofiles"])
-    if not 'reparsed' in os.listdir('results'):
-        subprocess.call(["mkdir", "results/reparsed"])
-    if not 'intersections' in os.listdir('results'):
-        subprocess.call(["mkdir", "results/intersections"])
-    if not 'clusters' in os.listdir('results'):
-        subprocess.call(["mkdir", "results/clusters"])
-    if not 'minmaxes' in os.listdir('results'):
-        subprocess.call(["mkdir", "results/minmaxes"])
-    if not 'logs_cpppolygons' in os.listdir('results'):
-        subprocess.call(["mkdir", "results/logs_cpppolygons"])
-    if not 'py_logs' in os.listdir('results'):
-        subprocess.call(["mkdir", "results/py_logs"])
+        subprocess.call(["mkdir", results_folder])
+    if not 'geofiles' in os.listdir(results_folder):
+        subprocess.call(["mkdir", results_folder + "/geofiles"])
+    if not 'reparsed' in os.listdir(results_folder):
+        subprocess.call(["mkdir", results_folder + "/reparsed"])
+    if not 'intersections' in os.listdir(results_folder):
+        subprocess.call(["mkdir", results_folder + "/intersections"])
+    if not 'clusters' in os.listdir(results_folder):
+        subprocess.call(["mkdir", results_folder + "/clusters"])
+    if not 'minmaxes' in os.listdir(results_folder):
+        subprocess.call(["mkdir", results_folder + "/minmaxes"])
+    if not 'logs_cpppolygons' in os.listdir(results_folder):
+        subprocess.call(["mkdir", results_folder + "/logs_cpppolygons"])
+    if not 'py_logs' in os.listdir(results_folder):
+        subprocess.call(["mkdir", results_folder + "/py_logs"])
+    if not 'clusters_lengths' in os.listdir(results_folder):
+        subprocess.call(["mkdir", results_folder + "/clusters_lengths"])
     runs_num = 0
     parameters_sets = []
     for thickness in thicknesses:
@@ -183,7 +146,6 @@ def main():
     run = 0
     skipped = 0
     unsuccess = 0
-    flag = False
     old_L_value = 0
     loop_start_time = time.time()
     last_iteration_time = None
@@ -226,14 +188,13 @@ def main():
                                # Seems to work properly.
         structure_name = '_'.join([str(word) for word in [run, h, L, R, sh, tau,
                                                           N, tra]])
-        fname_py_log = 'results/py_logs/' + structure_name
-        fname_geo = 'results/geofiles/' + structure_name + '.geo'
-        fname_intersections = 'results/intersections/' + structure_name
-        fname_clusters = 'results/clusters/' + structure_name
-        fname_minmaxes = 'results/minmaxes/' + structure_name
-        cpp_output = 'results/logs_cpppolygons/' + structure_name
+        fname_py_log = results_folder + '/py_logs/' + structure_name
+        fname_geo = results_folder + '/geofiles/' + structure_name + '.geo'
+        fname_intersections = results_folder + '/intersections/' + structure_name
+        fname_clusters = results_folder + '/clusters/' + structure_name
+        fname_minmaxes = results_folder + '/minmaxes/' + structure_name
+        cpp_output = results_folder + '/logs_cpppolygons/' + structure_name
         options = {
-            'FNAME_PY_LOG': fname_py_log,
             'FNAME_SEPARATE_LOG': cpp_output,
             'FNAME_INTERSECTIONS': fname_intersections,
             'FNAME_CLUSTERS': fname_clusters,
@@ -256,7 +217,11 @@ def main():
             str_out = str(key) + ' ' + str(options[key]) + '\n'
             f.write(str_out)
         f.close()
+######## run
         run_one_time()
+        single_file_conversion(results_folder, structure_name)
+        calculate_lengths(results_folder)
+########
         str_out = 'structure_name:' + structure_name + ':'
         for parameter in parameter_set:
             str_out += str(parameter) + ':' + str(parameter_set[parameter]) + ':'

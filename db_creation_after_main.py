@@ -61,7 +61,7 @@ def pretty_fprint_db(db, fname_db, sorted_keys):
 
 def main():
     if len(sys.argv) < 2:
-        print('usage: ./db_creation reulst_folder')
+        print('usage: ./db_creation results_folder')
         return None
     results_folder = sys.argv[1]
     list_of_entries = create_list_of_entries(results_folder)

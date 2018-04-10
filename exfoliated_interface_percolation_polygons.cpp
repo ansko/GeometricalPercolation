@@ -28,6 +28,7 @@ int main(int argc, char **argv)
     std::string FNAME_LOG = sp.getProperty("FNAME_LOG");
     std::string FNAME_SEPARATE_LOG = sp.getProperty("FNAME_SEPARATE_LOG");
     std::string PERC_FNAME = sp.getProperty("PERC_FNAME");
+    std::string FNAME_MINMAXES = sp.getProperty("FNAME_MINMAXES");
     float edgeLength = R * 2  * sin(PI_F / n);
     float innerRadius = edgeLength / 2 / tan(PI_F / n);
     float r = R * cos(PI_F / n);
@@ -79,13 +80,67 @@ int main(int argc, char **argv)
          << "\ncpp_Attempts:           " << attempt << std::endl;
     std::shared_ptr<CSGPrinterPolygons> printer_ptr;
     fout.close();
-
     fout.open(FNAME_SEPARATE_LOG);
     fout << "fi:" << polCyls.size() * pcVolume / cubeVolume
          << ":cpp_RealCylsNum:" << polCyls.size()
          << ":cpp_Attempts:" << attempt << std::endl;
     fout.close();
-
+    // creating file with every shell's ranges
+    fout.open(FNAME_MINMAXES);
+    for (auto pc_ptr : polCyls) {
+        float minx = cubeSize;
+        float miny = cubeSize;
+        float minz = cubeSize;
+        float maxx = 0;
+        float maxy = 0;
+        float maxz = 0;
+        auto vertices = pc_ptr->topFacet().vertices();
+        for (auto v : vertices) {
+            if (v.x() > 0 && v.x() < cubeSize) {
+                if (v.x() > maxx)
+                    maxx = v.x();
+                if (v.x() < minx)
+                    minx = v.x();
+            }
+            if (v.y() > 0 && v.y() < cubeSize) {
+                if (v.y() > maxy)
+                    maxy = v.y();
+                if (v.y() < miny)
+                    miny = v.y();
+            }
+            if (v.z() > 0 && v.z() < cubeSize) {
+                if (v.z() > maxz)
+                    maxz = v.z();
+                if (v.z() < minz)
+                    minz = v.z();
+            }
+        }
+        vertices = pc_ptr->bottomFacet().vertices();
+        for (auto v : vertices) {
+            if (v.x() > 0 && v.x() < cubeSize) {
+                if (v.x() > maxx)
+                    maxx = v.x();
+                if (v.x() < minx)
+                    minx = v.x();
+            }
+            if (v.y() > 0 && v.y() < cubeSize) {
+                if (v.y() > maxy)
+                    maxy = v.y();
+                if (v.y() < miny)
+                    miny = v.y();
+            }
+            if (v.z() > 0 && v.z() < cubeSize) {
+                if (v.z() > maxz)
+                    maxz = v.z();
+                if (v.z() < minz)
+                    minz = v.z();
+            }
+        }
+        fout << minx << " " << maxx << " "
+             << miny << " " << maxy << " "
+             << minz << " " << maxz << std::endl;
+    }
+    fout.close();
     printer_ptr->printToCSGAsPolygonalCylindersShells(FNAME, polCyls, shells);
     PercolationChecker pc(shells); 
     pc.sideToSide();
