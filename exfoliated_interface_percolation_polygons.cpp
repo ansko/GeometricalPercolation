@@ -26,6 +26,7 @@ int main(int argc, char **argv)
     int MAX_ATTEMPTS = (int)std::stod(sp.getProperty("MAX_ATTEMPTS"));
     std::string FNAME = sp.getProperty("FNAME");
     std::string FNAME_LOG = sp.getProperty("FNAME_LOG");
+    std::string FNAME_SEPARATE_LOG = sp.getProperty("FNAME_SEPARATE_LOG");
     std::string PERC_FNAME = sp.getProperty("PERC_FNAME");
     float edgeLength = R * 2  * sin(PI_F / n);
     float innerRadius = edgeLength / 2 / tan(PI_F / n);
@@ -72,12 +73,19 @@ int main(int argc, char **argv)
     float cubeVolume = pow(cubeSize, 3);
     std::ofstream fout;
     fout.open(FNAME_LOG, std::ofstream::app);
-    fout << "cpp: fi:                 "
+    fout << "cpp_fi:                 "
          << polCyls.size() * pcVolume / cubeVolume
-         << "\ncpp: CylsNum:            " << polCyls.size()
-         << "\ncpp: Attempts:           " << attempt << std::endl;
+         << "\ncpp_RealCylsNum:        " << polCyls.size()
+         << "\ncpp_Attempts:           " << attempt << std::endl;
     std::shared_ptr<CSGPrinterPolygons> printer_ptr;
     fout.close();
+
+    fout.open(FNAME_SEPARATE_LOG);
+    fout << "fi:" << polCyls.size() * pcVolume / cubeVolume
+         << ":cpp_RealCylsNum:" << polCyls.size()
+         << ":cpp_Attempts:" << attempt << std::endl;
+    fout.close();
+
     printer_ptr->printToCSGAsPolygonalCylindersShells(FNAME, polCyls, shells);
     PercolationChecker pc(shells); 
     pc.sideToSide();
