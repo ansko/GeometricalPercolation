@@ -49,26 +49,25 @@ def run_one_time():
     return None
 
 
-def main():
+def create_systems_set(results_folder='results'):
     # checking whether old results exists in folder
-    """
-    if 'results' in os.listdir():
+    if results_folder in os.listdir():
         print('CRITICAL ERROR:',
               'Folder "results" already exists')
         print('REASON OF EXIT:',
               'You may lose some data')
         return 0
-    """
     program_start_time = time.time()
     # configuring
-    results_folder = 'results'
         # vertices number
     n = 6
+######### Key parameter
         # MAX_ATTEMPTS in cpppolygons
-    max_attempts = 100
+#########
+    max_attempts = 100000
         # adjusting N
     if max_attempts < 1000000:
-        Ns_num = 12 
+        Ns_num = 12
     if max_attempts < 100000:
         Ns_num = 9
     if max_attempts < 10000:
@@ -77,15 +76,15 @@ def main():
         Ns_num = 5
     if max_attempts < 100:
         Ns_num = 3
-    # Ns =  [
-    #     5, 10, 15,          # 15 ~~ 100 steps for L == 5
-    #     20, 25,             # 25 ~~ 1k
-    #     30, 35, 40,         # 40 ~~ 10k
-    #     45, 50, 55,         # 55 ~~ 100k
-    #     60, 65, 70,         # 70 ~~ 1kk
-    # ]
     Ns = [5 * i for i in range(1, Ns_num)]
-    consecutive_unsuccessful_runs_number = 3
+    consecutive_unsuccessful_runs_number = 1 # Number of consecutive unsuccessful
+                                             # attempts to place specified fillers
+    if max_attempts < 10000:
+        consecutive_unsuccessful_runs_number = 10
+    if max_attempts < 1000:
+        consecutive_unsuccessful_runs_number = 100
+    if max_attempts < 100:
+        consecutive_unsuccessful_runs_number = 1000
     fname_structures_log = results_folder + '/structures_log'
     fname_log = 'main.log'
     trajectories = 10
@@ -95,13 +94,13 @@ def main():
     shs = [0.15, 0.25, 0.5]
     f = open(fname_log, 'w')
     f.write('-----    Main parameters    -----\n')
-    f.write('trajectories = ' + str(trajectories) + '\n')
-    f.write('thicknesses = ' + str(thicknesses) + '\n')
+    f.write('tra: ' + str(trajectories) + '\n')
+    f.write('hs:  ' + str(thicknesses) + '\n')
     f.write('max_attempts = ' + str(max_attempts) + '\n')
-    f.write('edges = ' + str(edges) + '\n')
-    f.write('Rs = ' + str(Rs) + '\n')
-    f.write('shs = ' + str(shs) + '\n')
-    f.write('Ns = ' + str(Ns) + '\n')
+    f.write('Ls:  ' + str(edges) + '\n')
+    f.write('Rs:  ' + str(Rs) + '\n')
+    f.write('shs: ' + str(shs) + '\n')
+    f.write('Ns:  ' + str(Ns) + '\n')
     f.write('---------------------------------\n')
     f.close()
     # preparing for runs
@@ -142,11 +141,23 @@ def main():
                                 'tra': trajectory
                             })
                             runs_num += 1
+    print('-----    Main parameters    -----')
+    print('tra:     ', int(trajectories))
+    print('hs:      ', *['%.1f' % h for h in thicknesses])
+    print('max_att: ', int(max_attempts))
+    print('Ls:      ', *[int(L) for L in edges])
+    print('Rs:      ', *[int(R) for R in Rs])
+    print('shs:     ', *['%.2f' % sh for sh in shs])
+    print('Ns:      ', *['%.2f' % N for N in Ns])
+    print('***')
+    print('consecutive unsuccessful runs', consecutive_unsuccessful_runs_number)
+    print('---------------------------------')
     # running
     run = 0
     skipped = 0
     unsuccess = 0
-    old_L_value = 0
+    old_L_value = 0 # Value of L at wich specified  number of fillers
+                    # was impossible to be placed.
     loop_start_time = time.time()
     last_iteration_time = None
     appro_last_time = 'infty'
@@ -160,11 +171,11 @@ def main():
             appro_last_time *= ongoing_time
         if not appro_last_time == 'infty':
             appro_last_time = int(appro_last_time)
-        print('run', run, 'skipped', skipped, 'done',
+        print('+' + str(run) + ' -' + str(skipped) + ';',
               str(int(100 * (run + skipped + 1) / runs_num)) + '%',
-              'last iteration', last_iteration_time,
+              'last step', last_iteration_time,
               'passed', int(ongoing_time),
-              'last', appro_last_time, 'sec')
+              'left', appro_last_time, 'sec')
         if unsuccess == consecutive_unsuccessful_runs_number:
             # should go to next L value
             old_L_value = L # now all Ls should be greater than this value
@@ -195,6 +206,7 @@ def main():
         fname_minmaxes = results_folder + '/minmaxes/' + structure_name
         cpp_output = results_folder + '/logs_cpppolygons/' + structure_name
         options = {
+            'STRUCTURE': structure_name,
             'FNAME_SEPARATE_LOG': cpp_output,
             'FNAME_INTERSECTIONS': fname_intersections,
             'FNAME_CLUSTERS': fname_clusters,
@@ -203,7 +215,7 @@ def main():
             'CUBE_EDGE_LENGTH': L,
             'OUTER_RADIUS': R,
             'MAX_ATTEMPTS': max_attempts,
-            'VERTICES_NUMBER': 6.0,
+            'VERTICES_NUMBER': n,
             'SHELL_THICKNESS': sh,
             'DISKS_NUM': N,
             'FNAME': fname_geo,
@@ -219,7 +231,7 @@ def main():
         f.close()
 ######## run
         run_one_time()
-        single_file_conversion(results_folder, structure_name)
+        single_file_conversion(results_folder, structure_name)  # int -> clusters
         calculate_lengths(results_folder)
 ########
         str_out = 'structure_name:' + structure_name + ':'
@@ -241,7 +253,7 @@ def main():
     os.remove('options.ini')
     # recalling the parameters in console
     print('-----    Main parameters    -----')
-    print('traj num:', int(trajectories))
+    print('tra:     ', int(trajectories))
     print('hs:      ', *['%.1f' % h for h in thicknesses])
     print('max_att: ', int(max_attempts))
     print('Ls:      ', *[int(L) for L in edges])
@@ -253,4 +265,4 @@ def main():
     return 0
 
 
-main()
+create_systems_set()

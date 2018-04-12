@@ -27,23 +27,35 @@ def create_list_of_entries(results_folder):
                                 new_entry['structure_name'],
                             'r')
         line_in_cpp = f_cpp_output.readline().split(':')
-        f_py_log = open(results_folder +
-                            '/py_logs/' + new_entry['structure_name'],
-                        'r')
-        line_in_py = f_py_log.readline().split(':')
         f_clusters = open(results_folder + '/clusters/' +
                               new_entry['structure_name'],
                           'r')
+        f_cluster_lengths = open(results_folder + '/clusters_lengths/' +
+                                     new_entry['structure_name'],
+                                 'r')
+        line_in_clu_lengths = f_cluster_lengths.readline().split()
         clu_num = 0
+        clusterized = 0.0
         for line in f_clusters: 
+            clusterized += len(line.split())
             clu_num += 1
         new_entry['fi'] = float(line_in_cpp[1])
         new_entry['Nreal'] = int(line_in_cpp[3])
         new_entry['att_real'] = int(line_in_cpp[5])
-        new_entry['clu_rate'] = float(line_in_py[1])
-        new_entry['ave_clu_size'] = float(line_in_py[3])
-        new_entry['ave_clu_len'] = float(line_in_py[5])
         new_entry['clusters_num'] = int(clu_num)
+        new_entry['clusterization_rate'] = clusterized / float(new_entry['Nreal'])
+        if clu_num > 0:
+            new_entry['ave_cluster_size'] = clusterized / float(clu_num)
+            new_entry['ave_cluster_x_len'] = float(line_in_clu_lengths[0])
+            new_entry['ave_cluster_y_len'] = float(line_in_clu_lengths[1])
+            new_entry['ave_cluster_z_len'] = float(line_in_clu_lengths[2])
+            new_entry['ave_cluster_len'] = float(line_in_clu_lengths[3])
+        else:
+            new_entry['ave_cluster_size'] = None
+            new_entry['ave_cluster_x_len'] = None
+            new_entry['ave_cluster_y_len'] = None
+            new_entry['ave_cluster_z_len'] = None
+            new_entry['ave_cluster_len'] = None
         list_of_entries.append(new_entry)
     return list_of_entries
 
@@ -53,40 +65,38 @@ def pretty_fprint_db(db, fname_db, sorted_keys):
     for entry in db:
         str_out = ''
         for key in sorted_keys:
+            if key not in entry.keys():
+                 print(key) 
+                 continue
             str_out += str(key) + ':' + str(entry[key]) + ':'
         str_out = str_out[:-1] + '\n'
         f.write(str_out)
     f.close()
 
 
-def main():
-    if len(sys.argv) < 2:
-        print('usage: ./db_creation results_folder')
-        return None
-    results_folder = sys.argv[1]
+def create_db_file():
+    """
+    After all systems are prepared and all parameter are calculated,
+    one can create a database.
+    """
+    # configuring
+    results_folder = 'results'
+    fname_db = 'system_db' 
     list_of_entries = create_list_of_entries(results_folder)
-    print(len(list_of_entries), 'entries')
-    #"""
-    # what values are already covered
     #
-    keys = ['L', 'N', 'R', 'h', 'sh', 'tau']
-    values = {key: set() for key in keys}
-    for entry in list_of_entries:
-        for key in keys:
-            values[key].add(entry[key])
-    for key in keys:
-        align = ' ' * (4 - len(key))
-        print(key, align, *sorted(list(values[key])))
+    # discover what values are already covered
     #
-    #"""
-    fname_db = 'db'
     sorted_keys = [
         'structure_name',                          # name of structure
         'L', 'N', 'R', 'h', 'sh', 'tau', 'tra',    # desired parameters
         'Nreal', 'att_real', 'fi',                 # real values of cpp parameters
-        'ave_clu_len', 'ave_clu_size', 'clu_rate', # some properties of resulting
-        'clusters_num'                             #   system
+        'ave_cluster_size',                        # clusters properties
+        'clusters_num', 'clusterization_rate',
+        'ave_cluster_x_len', 'ave_cluster_y_len', 'ave_cluster_z_len',
+        'ave_cluster_len'
     ]
     pretty_fprint_db(list_of_entries, fname_db, sorted_keys)
 
-main()
+
+if __name__ == '__main__':
+    create_db_file()

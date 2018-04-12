@@ -7,45 +7,30 @@ import pprint
 pprint=pprint.PrettyPrinter(indent=4).pprint
 
 
-results_folder = 'results100k'
+log_folder = 'logs100k'
+
+#
+# May be a bad idea!
+#
+# fi values when Nreal == Ndesired
+full_fis = set((
+    0.00942478,
+    0.0188496,
+    0.0282743,
+    0.0376991,
+    0.0471239,
+    0.0565487,
+    0.0659735
+))
+taus = [1.5, 2.5, 5.0]
 
 
-def project(db, projection_keys):
-    result = []
-    for entry in db:
-        new_entry = {}
-        for key in projection_keys:
-            new_entry[key] = entry[key]
-        result.append(new_entry)
-    return result
-
-
-def average(db, keys):
-    key_x = keys[0]
-    key_x_values = set()
-    key_y = keys[1]
-    for entry in db:
-        key_x_values.add(entry[key_x])
-    key_x_values = list(key_x_values)
-    key_x_values.sort()
-    key_y_values = {
-        key: [0, 0] for key in key_x_values
-    }                                        # [sum, num] for every key_x
-    for entry in db:
-        key_y_values[entry[key_x]][0] += entry[key_y]
-        key_y_values[entry[key_x]][1] += 1
-    for key in key_y_values.keys():
-        key_y_values[key] = float(key_y_values[key][0]) / key_y_values[key][1]
-    return key_y_values
-
-
-def get_db():
+def get_db(db_fname='system_db'):
     db = []
-    db_fname = 'db'
     f = open(db_fname, 'r')
     for line in f:
         entry = {}
-        ls = line.split(':')
+        ls = line[:-1].split(':')
         for i in range(int(len(ls) / 2)):
             key = ls[2 * i]
             value = ls[2 * i + 1]
@@ -55,193 +40,123 @@ def get_db():
                 try:
                     value = float(value)
                 except:
-                    pass
+                    value = str(value)
+                if value == 'None':
+                    value = None
             entry[key] = value
         db.append(entry)
     return db
 
 
-def intersections_to_clusters2(clusters):
-    a = set()
-    print(a)
-    if a:
-        print(a)
-    return
-    new_clusters = clusters
-
-    cluster = new_clusters[0]
-    for i in range(1, len(new_clusters)):
-        for j in range(len(cluster)):
-            if cluster[j] in new_clusters[i]:
-                new_clusters[i] = set(new_clusters[i])
-                new_clusters[i].update(cluster)
-                print(i, j ,new_clusters[i])
-                new_clusters[i] = list(new_clusters[i])
-    new_clusters = [new_clusters[i] for i in range(1, len(new_clusters))]
-
-    pprint(new_clusters)     
-    return
-
-def intersections_to_clusters(intersections):
-    clusters = []
-    # create clusters from intersections
-    for intersection in intersections:
-        particle1 = intersection[0]
-        particle2 = intersection[1]
-        flag_particle1_in_any_cluster = False
-        clusters_with_particle1 = []
-        flag_particle2_in_any_cluster = False
-        clusters_with_particle2 = []
-        for cluster_number, cluster in enumerate(clusters):
-            if particle1 in  cluster:
-                flag_particle1_in_any_cluster = True
-                clusters_with_particle1.append(cluster_number)
-            if particle2 in cluster:
-                flag_particle2_in_any_cluster = True
-                clusters_with_particle2.append(cluster_number)
-        if ((not flag_particle1_in_any_cluster) and
-            (not flag_particle2_in_any_cluster)):
-                new_cluster = [particle1, particle2]
-                clusters.append(new_cluster)
-        else:
-            if flag_particle1_in_any_cluster:
-                for cluster_number in clusters_with_particle1:
-                    if not particle2 in clusters[cluster_number]:
-                        clusters[cluster_number].append(particle2)
-            if flag_particle2_in_any_cluster:
-                for cluster_number in clusters_with_particle2:
-                    if not particle1 in clusters[cluster_number]:
-                        clusters[cluster_number].append(particle1)
-    # remove repeating clusters
-    for _ in range(len(clusters)):
-        if len(clusters) == 1:
-            break
-        repeating_clusters = []
-        for i, cluster_i in enumerate(clusters):
-            for j, cluster_j in enumerate(clusters):
-                if i == j:
-                   continue
-                for particle in cluster_i:
-                   if particle in cluster_j:
-                       if len(cluster_j) > len(cluster_i):
-                           repeating_clusters.append(i)
-                       elif len(cluster_j) < len(cluster_i):
-                           repeating_clusters.append(j)
-                       else:
-                           if (i not in repeating_clusters and
-                               j not in repeating_clusters):
-                                   repeating_clusters.append(i)
-        clusters = [
-            clusters[i] for i in (set(range(len(clusters))) -
-                                  set(repeating_clusters))
-            ]
-    return clusters
-
-
-def rate_fi():
-    """
-    Clusterization rate vs fi.
-    """
-    full_fis = set((
-        0.00942478,
-        0.0188496,
-        0.0282743,
-        0.0376991,
-        0.0471239,
-        0.0565487,
-        0.0659735))
-    taus = [1.5, 2.5, 5.0]
-    db = get_db()
-    tau_vals = set()
-    result = {
-        tau: {
-            fi: [] for fi in full_fis
-        } for tau in taus
-    }
-    for entry in db:
-        structure_name = entry['structure_name']
-        N = entry['Nreal']
-        fi = entry['fi']
-        if fi not in full_fis:
-            continue
-        tau = entry['tau']
-        clusterized = 0
-        f = open(results_folder + '/new_clusters/' + structure_name, 'r')
-        for line in f:
-            clusterized += len(line.split())
-        result[tau][fi].append(clusterized / N)
-    for tau in sorted(taus):
-        f = open('logs/clu_rate_on_fi_' + str(tau), 'w')
-        for fi in sorted(full_fis):
-            if result[tau][fi]:
-                f.write(
-                    str(fi) +
-                    ' ' +
-                    '%.2f' % (sum(result[tau][fi]) / len(result[tau][fi])) +
-                    ' ' +
-                    str(len(result[tau][fi])) +
-                    '\n')
-            else:
-                f.write(str(fi) + ' 0 0\n')
-    return None
-
-
-def clu_len_fi():
-    """
-    Clu_len / Box_len vs fi.
-    """
-    full_fis = set((
-        0.00942478,
-        0.0188496,
-        0.0282743,
-        0.0376991,
-        0.0471239,
-        0.0565487,
-        0.0659735))
-    taus = [1.5, 2.5, 5.0]
-    db = get_db()
+def N_div_fi_div_L3_L():
     Ls = set()
+    Ns = set()
+    db = get_db()
     for entry in db:
-        Ls.add(entry['L'])
+        Ls.add(int(entry['L']))
+        Ns.add(int(entry['Nreal']))
     Ls = sorted(list(Ls))
-    result = {
-       fi: {
-           tau: [
-           ] for tau in taus
-       } for fi in full_fis
-    }
+    Ns = sorted(list(Ns))
+    result = { L: { N: [] for N in Ns} for L in Ls }
+    result_ave = { L: [] for L in Ls }
     for entry in db:
-        structure_name = entry['structure_name']
-        fi = entry['fi']
-        tau = entry['tau']
-        L = entry['L']
-        if fi not in full_fis:
-            continue
-        f = open(results_folder + '/new_clusters_lengths/' + structure_name, 'r')
-        for line in f:
-            result[fi][tau].append(float(line.split()[3]) / L)
-    for fi in full_fis:
-        for tau in taus:
-            if result[fi][tau]:
-                result[fi][tau] = sum(result[fi][tau]) / len(result[fi][tau])
+        fi = float(entry['fi'])
+        L = int(entry['L'])
+        N = int(entry['Nreal'])
+        result[L][N].append(float(N) / fi / float(L**3))     # should be const
+        result_ave[L].append(float(N) / fi / float(L**3))    # -||-
+    for L in Ls:
+        if result_ave:
+            result_ave[L] = float(sum(result_ave[L])) / float(len(result_ave[L]))
+        else:
+            result_ave[L] = None
+        for N in Ns:
+            if result[L][N]:
+                result[L][N] = float(sum(result[L][N])) / float(len(result[L][N]))
             else:
-                result[fi][tau] = 0
+                result[L][N] = None
+    f = open(log_folder + '/ave_N_div_fi_div_L3_on_L', 'w')
+    f.write('L ave(L/(fi*N)) averaged_over_this_N\n')
+    for L in Ls:
+        if result_ave is not None:
+            f.write(' '.join([str(L), str(result_ave[L])]) + '\n')
+
+
+def clu_rate_vs_fi_on_tau():
+    db = get_db()
+    taus = set()
+    fis = set()
+    for entry in db:
+        fis.add(float(entry['fi']))
+        taus.add(float(entry['tau']))
+    taus = sorted(list(taus))
+    fis = sorted(list(fis))
+    result = { tau: { fi: [] for fi in fis } for tau in taus }
+    for entry in db:
+        fi = float(entry['fi'])
+        tau = float(entry['tau'])
+        rate = float(entry['clusterization_rate'])
+        result[tau][fi].append(rate)
     for tau in taus:
-        f = open('logs/clu_len_on_fi_' + str(tau), 'w')
-        for fi in sorted(list(full_fis)):
-            if result[fi][tau] is not None:
-                f.write(' '.join([str(fi), str(result[fi][tau])]) + '\n')
+        f = open(log_folder + '/clu_rate_vs_fi_on_tau_' + str(tau), 'w')
+        f.write('fi ave(clu_rate) averaged_over_this_N\n')
+        for fi in fis:
+            f.write(' '.join([str(fi),
+                              str(sum(result[tau][fi]) / len(result[tau][fi])),
+                              str(len(result[tau][fi])),
+                              '\n']))
 
 
-rate_fi()  # clusterization_rate vs fi
-clu_len_fi()
+def clu_len_vs_fi_on_tau():
+    db = get_db()
+    taus = set()
+    fis = set()
+    for entry in db:
+        fis.add(float(entry['fi']))
+        taus.add(float(entry['tau']))
+    taus = sorted(list(taus))
+    fis = sorted(list(fis))
+    result = { tau: { fi: [] for fi in fis } for tau in taus }
+    for entry in db:
+        fi = float(entry['fi'])
+        L = float(entry['L'])
+        tau = float(entry['tau'])
+        length = entry['ave_cluster_len']
+        try:
+            result[tau][fi].append(float(length) / L)
+        except:
+            pass
+    for tau in taus:
+        f = open(log_folder + '/clu_len_vs_fi_on_tau_' + str(tau), 'w')
+        f.write('fi ave(cluster_len/N) averaged_over_this_N\n')
+        for fi in fis:
+            if not result[tau][fi]:
+                continue
+            f.write(' '.join([str(fi),
+                              str(sum(result[tau][fi]) / len(result[tau][fi])),
+                              str(len(result[tau][fi])),
+                              '\n']))
+
+def full_analysis():
+    clu_len_vs_fi_on_tau() # clusterization_rate vs. fi
+    clu_rate_vs_fi_on_tau()            # average cluater length vs. fi
+    N_div_fi_div_L3_L()     # should grow due to desrease of the depleted layer
+
+
+if __name__ == '__main__':
+    full_analysis()
 
 
 """
-all_keys = [
-    'structure_name',
-    'L', 'N', 'R', 'h', 'sh', 'tau', 'tra',
-    'Nreal', 'att_real', 'fi',
-    'ave_clu_len', 'ave_clu_size', 'clu_rate'
-]
+Keep this list up-to-date with the list from create_db_file.py
+
+    sorted_keys = [
+        'structure_name',                          # name of structure
+        'L', 'N', 'R', 'h', 'sh', 'tau', 'tra',    # desired parameters
+        'Nreal', 'att_real', 'fi',                 # real values of cpp parameters
+        'ave_cluster_size',                        # clusters properties
+        'clusters_num', 'clusterization_rate',
+        'ave_cluster_x_len', 'ave_cluster_y_len', 'ave_cluster_z_len',
+        'ave_cluster_len'
+    ]
 """

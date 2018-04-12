@@ -24,6 +24,7 @@ int main(int argc, char **argv)
     float R = (float)std::stod(sp.getProperty("OUTER_RADIUS"));
     int N = (int)std::stod(sp.getProperty("DISKS_NUM"));
     int MAX_ATTEMPTS = (int)std::stod(sp.getProperty("MAX_ATTEMPTS"));
+    std::string structure_name = sp.getProperty("STRUCTURE");
     std::string FNAME = sp.getProperty("FNAME");
     std::string FNAME_LOG = sp.getProperty("FNAME_LOG");
     std::string FNAME_SEPARATE_LOG = sp.getProperty("FNAME_SEPARATE_LOG");
@@ -37,7 +38,18 @@ int main(int argc, char **argv)
     std::vector<std::shared_ptr<PolygonalCylinder> > shells;
     int attempt = 0;
     srand(time(NULL));
+    std::ofstream fout_log;
+    fout_log.open(FNAME_LOG, std::ofstream::app);
+    fout_log << "cpppolygons started with structure "
+             << structure_name << std::endl
+             << "Nreal attempt" << std::endl;
     while(polCyls.size() < N && ++attempt < MAX_ATTEMPTS) {
+        fout_log.open(FNAME_LOG, std::ofstream::app);
+        if (attempt % int(MAX_ATTEMPTS / 10) == 0)
+            fout_log << polCyls.size() << "/" << N
+                     << " " << attempt << "/" << MAX_ATTEMPTS
+                     << std::endl;
+        fout_log.close();
         std::shared_ptr<PolygonalCylinder> polCyl_ptr =
             std::make_shared<PolygonalCylinder>(n, h, R);
         std::shared_ptr<PolygonalCylinder> sh_ptr =
@@ -72,19 +84,18 @@ int main(int argc, char **argv)
     float pcVolume =  PI_F * pow(r, 2) * h;
     float shVolume =  PI_F * pow(r + sh, 2) * (h + 2 * sh);
     float cubeVolume = pow(cubeSize, 3);
-    std::ofstream fout;
-    fout.open(FNAME_LOG, std::ofstream::app);
-    fout << "cpp_fi:                 "
-         << polCyls.size() * pcVolume / cubeVolume
-         << "\ncpp_RealCylsNum:        " << polCyls.size()
-         << "\ncpp_Attempts:           " << attempt << std::endl;
     std::shared_ptr<CSGPrinterPolygons> printer_ptr;
-    fout.close();
+    std::ofstream fout;
     fout.open(FNAME_SEPARATE_LOG);
     fout << "fi:" << polCyls.size() * pcVolume / cubeVolume
          << ":cpp_RealCylsNum:" << polCyls.size()
          << ":cpp_Attempts:" << attempt << std::endl;
     fout.close();
+    fout_log.open(FNAME_LOG, std::ofstream::app);
+    fout_log << "fi " << polCyls.size() * pcVolume / cubeVolume << std::endl
+             << "Nreal " << polCyls.size() << std::endl
+             << "attempts " << attempt << std::endl;
+    fout_log.close();
     // creating file with every shell's ranges
     fout.open(FNAME_MINMAXES);
     for (auto pc_ptr : polCyls) {
