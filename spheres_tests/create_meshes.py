@@ -34,6 +34,7 @@ def main(libmesh_exe_folder='/home/anton/FEMFolder3',
     subprocess.call(['mkdir', test_results_folder + '/logs_gen_mesh'])
     fnames_per = os.listdir(test_results_folder + '/geo/per')
     fnames_irreg = os.listdir(test_results_folder + '/geo/irreg')
+    """
     for fname in fnames_per:
         log.write(fname + '\n')
         print(fname)
@@ -44,12 +45,13 @@ def main(libmesh_exe_folder='/home/anton/FEMFolder3',
         vol_name = fname[:-3] + 'vol'
         shutil.copyfile('generated.vol',
                         test_results_folder + '/meshes/per_' + vol_name)
+    """
     for fname in fnames_irreg:
         log.write(fname + '\n')
         print(fname)
         f = open(test_results_folder + '/logs_gen_mesh/' + fname, 'w')
         code = subprocess.call([exe_gen_mesh,
-                                test_results_folder + '/geo/per/' + fname,
+                                test_results_folder + '/geo/irreg/' + fname,
                                 '0.15', '2', '2'], stdout=f)
         vol_name = fname[:-3] + 'vol'
         shutil.copyfile('generated.vol',
