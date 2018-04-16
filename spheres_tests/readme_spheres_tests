@@ -1,0 +1,15 @@
+1) ./create_systems_pss.py - creates a set of systems containing 'spheres' that
+    have percolation (results/geo/per) and that do not have percolation
+    (results/geo/irreg). File names are n_(number_of_chains)_tau_(tau)_fi_(fi).geo.
+    After that it might be useful to delete sime systems leaving just interesting,
+    because meshing is a slow process.
+2) Adjust list diluted_fis in dilute_fis.py. You may uncomment lines 56-57 to
+    get sorted list of fi's. After that you can adjust list diluted_fis and
+    uncomment lines 59-60. This will leave only files with desired fi's.
+3) LD_LIBRARY_PATH=/home/anton/FEMFolder3/libs:/home/anton/FEMFolder3/my_libs
+   export LD_LIBRARY_PATH
+   ./create_meshes.py - creates .vol files for all structures from results/geo.
+    It is good to make all meshes before running cluster culculations becuase in
+    this case all mesehs are good.
+    This run may take long time.
+4) Run FEMmain.x on cluster with different input scripts.

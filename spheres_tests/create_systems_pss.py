@@ -9,7 +9,7 @@ import random
 import subprocess
 
 
-test_results_folder = 'results'
+test_results_folder = 'results_new'
 
 
 # Abbreviations:
@@ -19,40 +19,74 @@ test_results_folder = 'results'
 # n - number for chains
 # per - percolated
 # irreg - irregular
-#
+# ps - Polygonal Sphere
 
 
-def out_geo(system, fname):
+class PolygonalSphere:
+    def __init__(self, cx, cy, cz, r, N=20):
+        self.cx = cx
+        self.cy = cy
+        self.cz = cz
+        self.r = r
+        self.N = N
+
+    def geo_str(self, name):
+        str_out = 'solid {0} =\n'.format(name)
+        alphas = [i * 2 * math.pi / self.N for i in range(self.N)]
+        betas = [i * 2 * math.pi / self.N for i in range(self.N)]
+        for alpha in alphas:
+            for beta in betas:
+                x = self.cx + self.r * math.cos(alpha) * math.cos(beta)
+                y = self.cy + self.r * math.sin(alpha) * math.cos(beta)
+                z = self.cz + self.r * math.sin(beta)
+                factor = 1. / math.cos(2 * math.pi / self.N)**2
+                nx = self.r * math.cos(alpha) * math.cos(beta)
+                ny = self.r * math.sin(alpha) * math.cos(beta)
+                nz = self.r * math.sin(beta)
+                str_out += '\tplane({0}, {1}, {2}; {3}, {4}, {5})'.format(x, y, z,
+                               nx, ny, nz)
+                str_out += '\n\tand\n'
+        str_out = str_out[:-5] + ';\n'
+        return str_out
+
+
+def out_geo(system, fname, N=5):
+    str_out = 'algebraic3d\n\n'
+    str_fil = 'solid filler =\n'
+    str_int = 'solid interface =\n'
+    str_mat = 'solid matrix =\n\t'
+    pss = system['particles']
     r = system['r']
     sh = system['sh']
-    particles = system['particles']
     L = system['L']
-    str_out = 'algebraic3d\n\n'
-    fillers = 'solid filler =\n'
-    interface = 'solid interface =\n'
-    matrix = 'solid matrix = orthobrick(0, 0, 0; {0}, {0}, {0})'.format(L)
-    excluded_matrix = '\n\tand not (\n\t' # will have interface and filler
-    for i, particle in enumerate(particles):
-        x = particle[0]
-        y = particle[1]
-        z = particle[2]
-        str_out += 'solid filler{0} = '.format(i)
-        str_out += 'sphere({0}, {1}, {2}; {3});\n\n'.format(x, y, z, r)
-        str_out += 'solid shell{0} = '.format(i)
-        str_out += 'sphere({0}, {1}, {2}; {3})\n'.format(x, y, z, r + sh)
-        str_out += '\tand not '
-        str_out += 'sphere({0}, {1}, {2}; {3});\n\n'.format(x, y, z, r)
-        fillers += '\tfiller{0} or\n'.format(i)
-        interface += '\tshell{0} or\n'.format(i)
-        excluded_matrix += 'sphere({0}, {1}, {2}; {3})\n\n'.format(x, y, z, r + sh)
-        if i != len(particles) - 1:
-            excluded_matrix += '\tor '
-    excluded_matrix += ');\n'  
-    fillers = fillers[:-4] + ';\n\ntlo filler;\n\n'
-    interface = interface[:-4] + ';\n\ntlo interface -transparent;\n\n'
-    matrix += excluded_matrix + '\ntlo matrix -transparent;'
+    str_brick = 'orthobrick('
+    str_brick += '{0}, {1}, {2}; {3}, {4}, {5})'.format(0, 0, 0, L, L, L)
+    for i in range(len(pss)):
+        if i != 0:
+            str_mat += '\n\tand '
+        ps_fil = PolygonalSphere(pss[i][0], pss[i][1], pss[i][2], r, N)
+        ps_int = PolygonalSphere(pss[i][0], pss[i][1], pss[i][2], r + sh, N)
+        str_fil_ps = ps_fil.geo_str('filler' + str(i))
+        str_int_ps = ps_int.geo_str('shell' + str(i))
+        str_int_util_ps = ps_int.geo_str('shell_util' + str(i))
+        str_out += str_fil_ps[:-2] + '\tand\n\t' + str_brick + '\n;\n'
+        str_out += str_int_ps[:-2] + '\tand\n\t' + str_brick + '\n;\n'
+        str_out += str_int_util_ps[:-2] + '\nand\n\t' + str_brick + '\n;\n'
+        str_fil += '\tfiller' + str(i)
+        str_int += '\t(shell' + str(i) + ' and not filler' + str(i)  + ')'
+        str_mat += 'not\n\tshell_util' + str(i)
+        if i != len(pss) - 1:
+            str_fil += '\n\tor\n'
+            str_int += '\n\tor\n'
+    str_fil += '\n;\n'
+    str_int += '\n;\n'
+    str_mat += '\n\tand\n\t' + str_brick + '\n ;'
+    str_out += str_fil + str_int + str_mat
+    str_out += '\ntlo filler;'
+    str_out += '\ntlo interface -transparent;'
+    str_out += '\ntlo matrix -transparent;'
     f = open(fname, 'w')
-    f.write(str_out + fillers + interface + matrix)
+    f.write(str_out)
     return None
 
 
@@ -233,18 +267,11 @@ def main(test_results_folder='results'):
     min_fi_filler = 0.001
 
 
-    [system_per, system_irreg] = make_systems(r, sh, double_overlap, 1,
-                                              max_attempts, scaling)
-    fname_per = 'test_pss.geo'
-    out_geo(system_per, fname_per)
-    return
-
     while fi > min_fi_filler:
         log_str = run_one_time(test_results_folder, r, sh, double_overlap,
                                n_chains, max_attempts, scaling)
         fi = float(log_str.split()[4])
         log.write(log_str)
-        print(scaling, fi)
         scaling *= 1.05
     return None
 
